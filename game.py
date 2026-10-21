@@ -1,35 +1,30 @@
 import streamlit as st
 import random
-import base64
 
 # --- Constants ---
-RUPEE_SYMBOL = u"\u20B9"
+RUPEE_SYMBOL = "\u20B9"
 CHOICES = {'r': '🪨 Rock', 'p': '📄 Paper', 's': '✂️ Scissors'}
+BEATS = {'r': 's', 'p': 'r', 's': 'p'}  # key beats value
+
+# --- Page Setup (must be the first Streamlit command) ---
+st.set_page_config(page_title="Rock Paper Scissors Deluxe", page_icon="🎮", layout="centered")
 
 # --- Game State (Session Variables) ---
-if "balance" not in st.session_state:
-    st.session_state.balance = 0.0
-if "user_wins" not in st.session_state:
-    st.session_state.user_wins = 0
-if "comp_wins" not in st.session_state:
-    st.session_state.comp_wins = 0
-if "bet" not in st.session_state:
-    st.session_state.bet = 0.0
+defaults = {"balance": 0.0, "user_wins": 0, "comp_wins": 0, "bet": 0.0}
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
 
-# --- Page Setup ---
-st.set_page_config(page_title="Rock Paper Scissors Deluxe", page_icon="🎮", layout="centered")
 st.title("🪨📄✂️ Rock Paper Scissors Deluxe")
 st.markdown("#### Play the classic game with a modern twist and some flair!")
 
-# --- Function to Play Sound ---
-def play_sound(sound_type):
-    if sound_type == "win":
-        sound_url = "https://actions.google.com/sounds/v1/crowds/cheer.ogg"
-    elif sound_type == "lose":
-        sound_url = "https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"
-    else:
-        sound_url = "https://actions.google.com/sounds/v1/cartoon/pop.ogg"
 
+def play_sound(sound_type):
+    urls = {
+        "win": "https://actions.google.com/sounds/v1/crowds/cheer.ogg",
+        "lose": "https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg",
+    }
+    sound_url = urls.get(sound_type, "https://actions.google.com/sounds/v1/cartoon/pop.ogg")
     st.markdown(
         f"""
         <audio autoplay>
@@ -39,13 +34,19 @@ def play_sound(sound_type):
         unsafe_allow_html=True,
     )
 
+
+def reset_game():
+    for key, value in defaults.items():
+        st.session_state[key] = value
+
+
 # --- Betting Section ---
 if st.session_state.bet == 0.0:
     bet_input = st.number_input(f"💰 Enter your bet amount ({RUPEE_SYMBOL}):", min_value=1.0, step=1.0)
     if st.button("Start Game"):
         st.session_state.bet = bet_input
         st.session_state.balance = bet_input
-        st.success(f"Starting Balance: {RUPEE_SYMBOL}{st.session_state.balance:.2f}")
+        st.rerun()  # switch to the game screen immediately
 
 # --- Game Play Section ---
 else:
@@ -75,15 +76,13 @@ else:
         if user_choice == comp_choice:
             result = "🤝 It's a Tie!"
             animation = "neutral"
-        elif (user_choice == 'r' and comp_choice == 's') or \
-             (user_choice == 'p' and comp_choice == 'r') or \
-             (user_choice == 's' and comp_choice == 'p'):
-            result = "🎉 You Won! Your bet doubled!"
+        elif BEATS[user_choice] == comp_choice:
+            result = "🎉 You Won! Your balance doubled!"
             st.session_state.balance *= 2
             st.session_state.user_wins += 1
             animation = "win"
         else:
-            result = "💀 You Lost! Half your bet lost!"
+            result = "💀 You Lost! Half your balance lost!"
             st.session_state.balance /= 2
             st.session_state.comp_wins += 1
             animation = "lose"
@@ -103,26 +102,30 @@ else:
                 "<style>@keyframes shake {0%,100%{transform:translateX(0);}25%{transform:translateX(-10px);}75%{transform:translateX(10px);}}</style>",
                 unsafe_allow_html=True,
             )
-        elif animation == "neutral":
-            st.markdown("<div style='animation: pulse 1s infinite; color:#cccccc;'>😐</div>"
-                        "<style>@keyframes pulse {0%,100%{opacity:1;}50%{opacity:0.5;}}</style>", unsafe_allow_html=True)
+        else:
+            st.markdown(
+                "<div style='animation: pulse 1s infinite; color:#cccccc;'>😐</div>"
+                "<style>@keyframes pulse {0%,100%{opacity:1;}50%{opacity:0.5;}}</style>",
+                unsafe_allow_html=True,
+            )
 
     st.markdown("---")
 
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("🔁 Restart Game"):
-            st.session_state.bet = 0.0
-            st.session_state.balance = 0.0
-            st.session_state.user_wins = 0
-            st.session_state.comp_wins = 0
-            st.experimental_rerun()
+            reset_game()
+            st.rerun()
     with col2:
         if st.button("🏁 New Round"):
-            st.experimental_rerun()
+            st.rerun()
     with col3:
         if st.button("❌ Quit"):
             st.balloons()
-            st.warning(f"**Final Results:**\n\n🧍 You: {st.session_state.user_wins}\n🤖 Computer: {st.session_state.comp_wins}\n💰 Final Balance: {RUPEE_SYMBOL}{st.session_state.balance:.2f}")
-            st.session_state.bet = 0.0
+            st.warning(
+                f"**Final Results:**\n\n🧍 You: {st.session_state.user_wins}\n\n"
+                f"🤖 Computer: {st.session_state.comp_wins}\n\n"
+                f"💰 Final Balance: {RUPEE_SYMBOL}{st.session_state.balance:.2f}"
+            )
+            reset_game()
             st.stop()
